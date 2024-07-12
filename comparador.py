@@ -45,20 +45,23 @@ def compare_dataframes(df1, df2):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.write("### Primer DataFrame")
+        st.write("### Archivo del Proceso")
         st.write(f"Longitud del DataFrame: {len(df1)}")
         st.write("Columnas:", df1.columns.tolist())
     
     with col2:
-        st.write("### Segundo DataFrame")
+        st.write("### Archivo de Control")
         st.write(f"Longitud del DataFrame: {len(df2)}")
         st.write("Columnas:", df2.columns.tolist())
 
     if df1.equals(df2):
         st.success("Los archivos son idénticos!")
     else:
-        st.warning("Los archivos tienen diferencias.")
-
+        st.warning(f"""
+                    Los archivos tienen diferencias.\n
+                    Te faltan [{len(df2) - len(df1)}] filas.\n
+                    Te faltan [{len(df2.columns) - len(df1.columns)}] columnas.
+                    """)
 def main():
     st.title('Comparador de Archivos')
     
@@ -67,29 +70,29 @@ def main():
     df1_preview, df2_preview = None, None
 
     with col1:
-        file1 = st.file_uploader("Carga el primer archivo", type=['csv', 'txt'], key='file1')
-        delimiter1 = st.selectbox("Selecciona el delimitador para el primer archivo", 
+        file1 = st.file_uploader("Carga el Archivo del Proceso", type=['csv', 'txt'], key='file1')
+        delimiter1 = st.selectbox("Selecciona el delimitador para el Archivo del Proceso", 
                                   options=[',', '|', ';', '\t'], index=0, key='delim1')
-        encoding1 = st.selectbox("Selecciona la codificación para el primer archivo",
+        encoding1 = st.selectbox("Selecciona la codificación para el Archivo del Proceso",
                                  options=['utf-8', 'latin-1'], index=0, key='enc1')
         
         if file1 is not None:
             df1_preview = load_data_with_progress(file1, delimiter1, encoding1)
             if df1_preview is not None:
-                st.write("### Previsualización del primer archivo")
+                st.write("### Previsualización del Archivo del Proceso")
                 st.dataframe(df1_preview.head())
 
     with col2:
-        file2 = st.file_uploader("Carga el segundo archivo", type=['csv', 'txt'], key='file2')
-        delimiter2 = st.selectbox("Selecciona el delimitador para el segundo archivo", 
+        file2 = st.file_uploader("Carga el Archivo de Control", type=['csv', 'txt'], key='file2')
+        delimiter2 = st.selectbox("Selecciona el delimitador para el Archivo de Control", 
                                   options=[',', '|', ';', '\t'], index=0, key='delim2')
-        encoding2 = st.selectbox("Selecciona la codificación para el segundo archivo",
+        encoding2 = st.selectbox("Selecciona la codificación para el Archivo de Control",
                                  options=['utf-8', 'latin-1'], index=0, key='enc2')
         
         if file2 is not None:
             df2_preview = load_data_with_progress(file2, delimiter2, encoding2)
             if df2_preview is not None:
-                st.write("### Previsualización del segundo archivo")
+                st.write("### Previsualización del Archivo de Control")
                 st.dataframe(df2_preview.head())
     
     if st.button("Comparar archivos"):
