@@ -47,12 +47,16 @@ def compare_dataframes(df1, df2):
     with col1:
         st.write("### Archivo del Proceso")
         st.write(f"Longitud del DataFrame: {len(df1)}")
-        st.write("Columnas:", df1.columns.tolist())
+        st.write(f"Número de columnas: {len(df1.columns)}")
+        with st.expander("Ver columnas del Archivo del Proceso"):
+            st.write(df1.columns.tolist())
     
     with col2:
         st.write("### Archivo de Control")
         st.write(f"Longitud del DataFrame: {len(df2)}")
-        st.write("Columnas:", df2.columns.tolist())
+        st.write(f"Número de columnas: {len(df2.columns)}")
+        with st.expander("Ver columnas del Archivo de Control"):
+            st.write(df2.columns.tolist())
 
     if df1.equals(df2):
         st.success("Los archivos son idénticos!")
@@ -62,6 +66,35 @@ def compare_dataframes(df1, df2):
                     Te faltan [{len(df2) - len(df1)}] filas.\n
                     Te faltan [{len(df2.columns) - len(df1.columns)}] columnas.
                     """)
+
+        common_rows = df1[df1.apply(tuple, axis=1).isin(df2.apply(tuple, axis=1))]
+        
+        with st.expander("Ver filas comunes"):
+            st.write("### Filas comunes en ambos archivos")
+            st.dataframe(common_rows)
+
+        differences = df1.merge(df2, indicator=True, how='outer')
+
+        differences['APARECE EN'] = differences['_merge'].map({'left_only': 'Archivo del Proceso', 
+                                                           'right_only': 'Archivo de Control', 
+                                                           'both': 'Ambos'})
+        differences = differences[differences['_merge'] != 'both']
+
+        with st.expander("Ver diferencias"):
+            st.write("### Diferencias entre los archivos")
+            st.dataframe(differences.drop(columns=['_merge']))
+
+        only_in_process = df1[~df1.apply(tuple, axis=1).isin(df2.apply(tuple, axis=1))]
+        only_in_control = df2[~df2.apply(tuple, axis=1).isin(df1.apply(tuple, axis=1))]
+
+        with st.expander("Ver filas solo en Archivo del Proceso"):
+            st.write("### Filas solo en el Archivo del Proceso")
+            st.dataframe(only_in_process)
+
+        with st.expander("Ver filas solo en Archivo de Control"):
+            st.write("### Filas solo en el Archivo de Control")
+            st.dataframe(only_in_control)
+
 def main():
     st.title('Comparador de Archivos')
     
@@ -87,7 +120,7 @@ def main():
         delimiter2 = st.selectbox("Selecciona el delimitador para el Archivo de Control", 
                                   options=[',', '|', ';', '\t'], index=0, key='delim2')
         encoding2 = st.selectbox("Selecciona la codificación para el Archivo de Control",
-                                 options=['utf-8', 'latin-1'], index=0, key='enc2')
+                                 options=['utf-8', 'latin-1', 'cp1252'], index=0, key='enc2')
         
         if file2 is not None:
             df2_preview = load_data_with_progress(file2, delimiter2, encoding2)
