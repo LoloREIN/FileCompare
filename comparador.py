@@ -1,5 +1,64 @@
 import streamlit as st
 import pandas as pd
+from difflib import SequenceMatcher
+import boto3
+import os
+from datetime import datetime
+
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_aws import ChatBedrock
+from botocore.config import Config
+import langchain.globals as lg
+
+# Configuración de Amazon Bedrock
+lg.set_verbose(False)
+
+aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
+aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+aws_default_region = os.getenv("AWS_DEFAULT_REGION")
+
+retry_config = Config(region_name="us-east-1")
+boto3_bedrock_runtime = boto3.client("bedrock-runtime", config=retry_config)
+
+model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+
+model_kwargs = {
+    "max_tokens": 1000000,
+    "temperature": 0.9,
+    "top_k": 250,
+    "top_p": 1,
+    "stop_sequences": ["\n\nHuman"],
+}
+
+model = ChatBedrock(
+    client=boto3_bedrock_runtime,
+    model_id=model_id,
+    model_kwargs=model_kwargs,
+)
+
+PROMPT_TEMPLATE = """
+    Human: Eres un experto en analizar diferencias entre filas de datos.
+    Por favor, compara las siguientes dos filas y explica las diferencias:
+    
+    Fila 1: {row1}
+    Fila 2: {row2}
+
+    Assistant:
+    """
+
+def get_difference_explanation(row1, row2):
+    formatted_prompt = PROMPT_TEMPLATE.format(row1=row1, row2=row2)
+    messages = [("human", formatted_prompt)]
+    prompt_template = ChatPromptTemplate.from_messages(messages)
+    chain = prompt_template | model | StrOutputParser()
+
+    response = chain.invoke({
+        "row1": row1,
+        "row2": row2,
+    })
+
+    return response.strip()
 
 def load_data_with_progress(uploaded_file, delimiter, encoding):
     if uploaded_file is not None:
@@ -94,6 +153,23 @@ def compare_dataframes(df1, df2):
         with st.expander("Ver filas solo en Archivo de Control"):
             st.write("### Filas solo en el Archivo de Control")
             st.dataframe(only_in_control)
+
+        with st.expander("Ver filas similares con diferencias"):
+            similar_rows = find_similar_rows(only_in_process, only_in_control)
+            st.write("### Filas similares con diferencias")
+            for row1, row2 in similar_rows:
+                st.write(f"Proceso: {row1}")
+                st.write(f"Control: {row2}")
+                diff_desc = get_difference_explanation(row1, row2)
+                st.write(f"Diferencias: {diff_desc}")
+
+def find_similar_rows(df1, df2, threshold=0.8):
+    similar_rows = []
+    for _, row1 in df1.iterrows():
+        for _, row2 in df2.iterrows():
+            if SequenceMatcher(None, str(row1), str(row2)).ratio() > threshold:
+                similar_rows.append((row1, row2))
+    return similar_rows
 
 def main():
     st.title('Comparador de Archivos')
